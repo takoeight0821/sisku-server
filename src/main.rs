@@ -4,9 +4,12 @@ use actix_cors::Cors;
 use actix_web::{
     guard,
     web::{self, Data},
-    App, HttpServer,
+    App, HttpResponse, HttpServer,
 };
-use async_graphql::{EmptyMutation, EmptySubscription, Object, Schema};
+use async_graphql::{
+    http::{playground_source, GraphQLPlaygroundConfig},
+    EmptyMutation, EmptySubscription, Object, Schema,
+};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
 // use actix_files as fs;
 
@@ -32,6 +35,13 @@ async fn index(
     schema.execute(request.into_inner()).await.into()
 }
 
+async fn index_playground() -> HttpResponse {
+    let source = playground_source(GraphQLPlaygroundConfig::new("/").subscription_endpoint("/"));
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(source)
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
@@ -43,6 +53,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .app_data(Data::new(schema.clone()))
             .service(web::resource("/").guard(guard::Post()).to(index))
+            .service(web::resource("/").guard(guard::Get()).to(index_playground))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
